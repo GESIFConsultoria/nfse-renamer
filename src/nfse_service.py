@@ -361,14 +361,20 @@ def upload_to_ftp(local_file_path, remote_filename):
 def should_process_file(filename):
     """
     Verifica se o arquivo deve ser processado.
-    Processa apenas arquivos que começam com "NFSE" em maiúsculo.
+    Processa qualquer PDF que ainda não foi processado.
+    Arquivos já processados são renomeados para o padrão "nfse_" (minúsculo)
+    e por isso são ignorados, evitando reprocessamento.
     """
     if not filename.lower().endswith(".pdf"):
         return False
     
-    # Processa apenas arquivos que começam com "NFSE" (maiúsculo)
-    # Isso evita reprocessar arquivos já processados (que começam com "nfse" minúsculo)
-    return filename.startswith("NFSE_")
+    # Ignora arquivos já processados (saída renomeada começa com "nfse_" minúsculo)
+    # A comparação é sensível a maiúsculas: um arquivo de entrada "NFSE_..." continua
+    # sendo processado, pois apenas a saída final usa "nfse_" minúsculo.
+    if filename.startswith("nfse_"):
+        return False
+    
+    return True
 
 def check_if_file_was_processed(original_path):
     """
@@ -479,10 +485,10 @@ def process_pdf(path, retry_count=0):
             logging.debug(f"Ignorando arquivo fora de INPUT_DIR: {path}")
             return False
         
-        # Verifica se arquivo deve ser processado (apenas os que começam com "NFSE" em maiúsculo)
+        # Verifica se arquivo deve ser processado (qualquer PDF ainda não processado)
         filename = os.path.basename(path)
         if not should_process_file(filename):
-            logging.debug(f"Ignorando arquivo (não começa com NFSE_): {path}")
+            logging.debug(f"Ignorando arquivo (não é PDF ou já processado): {path}")
             return False
         
         # Aguarda arquivo estar pronto
@@ -706,10 +712,10 @@ class NFSeHandler(FileSystemEventHandler):
             logging.debug(f"Arquivo detectado fora de INPUT_DIR, ignorando: {event.src_path}")
             return
         
-        # Processa apenas arquivos que começam com "NFSE" em maiúsculo
+        # Processa qualquer PDF ainda não processado (ignora a saída "nfse_" minúsculo)
         filename = os.path.basename(event.src_path)
         if not should_process_file(filename):
-            logging.debug(f"Arquivo detectado mas ignorado (não começa com NFSE_): {filename}")
+            logging.debug(f"Arquivo detectado mas ignorado (já processado): {filename}")
             return
         
         logging.info(f"Arquivo detectado pelo watchdog: {filename}")

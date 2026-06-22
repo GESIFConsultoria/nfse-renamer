@@ -1,8 +1,10 @@
 # 📄 NFSe Renamer Service — README
 
-Serviço Linux em Python para extração automática de metadados de NFSe (Prefeitura de Porto Alegre) a partir de arquivos PDF, com renomeação padronizada e movimentação por diretórios monitorados.
+Serviço Linux em Python para extração automática de metadados de NFSe a partir de arquivos PDF, com renomeação padronizada e movimentação por diretórios monitorados.
 
-**⚠️ Importante**: O serviço processa apenas arquivos PDF que começam com `NFSE_` (maiúsculo). Arquivos já processados (que começam com `nfse_` em minúsculo) são automaticamente ignorados para evitar reprocessamento.
+**⚠️ Importante**: O serviço processa **qualquer arquivo PDF** colocado na pasta de entrada, independentemente do nome. Os arquivos já processados são renomeados para o padrão `nfse_...` (minúsculo) e, por isso, são automaticamente ignorados em ciclos seguintes, evitando reprocessamento. Os arquivos que não puderem ser lidos/extraídos são movidos para `reject` (e também não são reprocessados).
+
+**Observação sobre extração**: as regras de extração (regex) foram desenvolvidas e testadas com o layout da Prefeitura de Porto Alegre. PDFs de outros municípios são lidos normalmente, mas só serão renomeados se o conteúdo casar com as regex; caso contrário vão para `reject`. Para suportar outros municípios, as regex precisam ser estendidas (ver seção 6).
 
 O objetivo é garantir que todos os PDFs entregues ao conector fiscal sigam o padrão definido pelo cliente:
 
@@ -363,12 +365,12 @@ journalctl -u nfse-renamer --since today
    - **Modo Polling**: Detecta no próximo ciclo de verificação (configurável)
 
 3. **Validação e preparação**:
-   - Verifica se arquivo começa com "NFSE_" (maiúsculo) - apenas estes são processados
+   - Valida extensão PDF (apenas arquivos `.pdf` são considerados)
+   - Ignora arquivos já processados (que começam com `nfse_` em minúsculo)
    - Aguarda arquivo estar completamente escrito
    - Verifica se não está em uso por outro processo
-   - Valida extensão PDF
    
-   **Importante**: O serviço processa apenas arquivos que começam com `NFSE_` em maiúsculo. Isso evita reprocessar arquivos já processados (que ficam como `nfse_...` em minúsculo).
+   **Importante**: O serviço processa **qualquer PDF** colocado na pasta de entrada, independentemente do nome. Arquivos já processados ficam com o prefixo `nfse_` (minúsculo) e são automaticamente ignorados em ciclos seguintes, evitando reprocessamento.
 
 4. **Extração de metadados** (com retry em caso de erro):
    - CNPJ emitente
@@ -578,6 +580,8 @@ Série	(?i)Série\s*([A-Za-z0-9\-_]+)
 **Nota**: A série aceita letras, números, hífens e underscores (ex: "1", "A", "NF", "1-A", etc.).
 
 Essas regex foram testadas com PDFs reais da Prefeitura de Porto Alegre.
+
+**Suporte a outros municípios**: o serviço lê **qualquer PDF** colocado na pasta de entrada, mas a extração depende do conteúdo casar com as regex acima. Layouts de NFSe variam por município (rótulos e posições diferentes), então PDFs de outras prefeituras só serão renomeados se o texto contiver os mesmos padrões; caso contrário, são movidos para `reject`. Para suportar um novo município, ajuste/estenda as regex em `src/extract_nfse_info.py` com base em um PDF de exemplo daquele município.
 
 ## ✔️ 7. Tratamento de Erros
 
