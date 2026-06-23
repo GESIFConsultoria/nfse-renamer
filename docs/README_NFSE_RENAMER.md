@@ -570,7 +570,12 @@ FTP_USE_TLS="true"
 
 Altere conforme necessidade de cada cliente/ambiente.
 
-## ✔️ 6. Regras de Extração (Regex)
+## ✔️ 6. Regras de Extração
+
+O serviço **detecta automaticamente o layout** do PDF e usa o extrator adequado (`src/extract_nfse_info.py`).
+
+### Layout legado (Prefeitura de Porto Alegre)
+
 Campo	Regex
 CNPJ do Emitente	\b\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}\b
 Número da Nota (NFSe)	Número da Nota\s*([0-9]{1,10})
@@ -579,9 +584,30 @@ Série	(?i)Série\s*([A-Za-z0-9\-_]+)
 
 **Nota**: A série aceita letras, números, hífens e underscores (ex: "1", "A", "NF", "1-A", etc.).
 
-Essas regex foram testadas com PDFs reais da Prefeitura de Porto Alegre.
+### Layout nacional (DANFSe v2.0 / Sistema Nacional da NFS-e)
 
-**Suporte a outros municípios**: o serviço lê **qualquer PDF** colocado na pasta de entrada, mas a extração depende do conteúdo casar com as regex acima. Layouts de NFSe variam por município (rótulos e posições diferentes), então PDFs de outras prefeituras só serão renomeados se o texto contiver os mesmos padrões; caso contrário, são movidos para `reject`. Para suportar um novo município, ajuste/estenda as regex em `src/extract_nfse_info.py` com base em um PDF de exemplo daquele município.
+Usado pelas prefeituras que aderiram ao padrão nacional. A detecção ocorre por marcadores no texto (`DANFSe`, `Sistema Nacional da NFS-e`, `CHAVE DE ACESSO`, `NÚMERO DA DPS`).
+
+A extração usa a **chave de acesso de 50 dígitos** como fonte autoritativa (estrutura fixa, independente de variações visuais entre municípios):
+
+| Posição | Conteúdo |
+|---|---|
+| 1–7 | Código IBGE do município |
+| 8 | Ambiente gerador |
+| 9 | Tipo de inscrição (2 = CNPJ) |
+| 10–23 | **CNPJ do emitente** |
+| 24–36 | **Número da NFS-e** |
+| 37–40 | AAMM da emissão |
+| 41–49 | Código numérico |
+| 50 | Dígito verificador |
+
+- **CNPJ** e **Número da NFS-e**: extraídos da chave de acesso.
+- **Número da DPS** (equivalente ao RPS): os dois primeiros números do cabeçalho são, em ordem, o nº da NFS-e e o nº da DPS; o primeiro é validado contra a chave e, se confere, o segundo é usado como DPS.
+- **Série**: regex `(?i)S[ÉE]RIE\s+DA\s+DPS\s*([0-9A-Za-z]+)`.
+
+Como é um padrão nacional, o mesmo extrator atende todos os municípios que emitem no DANFSe v2.0 (ex.: Rio de Janeiro, Porto Alegre, Manaus, Indaiatuba, Curitiba, Belo Horizonte).
+
+**Outros layouts**: PDFs que não casem com nenhum dos extratores são movidos para `reject` com o motivo no log. Para suportar um novo formato, ajuste/estenda os extratores em `src/extract_nfse_info.py` com base em um PDF de exemplo.
 
 ## ✔️ 7. Tratamento de Erros
 
