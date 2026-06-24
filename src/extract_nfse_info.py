@@ -15,7 +15,6 @@ REGEX_SERIE = r"(?i)Série\s*([A-Za-z0-9\-_]+)"
 
 # --- Layout nacional (DANFSe v2.0 / Sistema Nacional da NFS-e) ---
 REGEX_CHAVE = r"(?<!\d)(\d{50})(?!\d)"
-REGEX_SERIE_NAC = r"(?i)S[ÉE]RIE\s+DA\s+DPS\s*[\r\n ]*([0-9A-Za-z]+)"
 NAC_MARKERS = ("danfse", "sistema nacional da nfs-e",
                "chave de acesso", "número da dps", "numero da dps")
 
@@ -58,26 +57,23 @@ def _extract_national(text):
     cnpj = chave[9:23]                 # posições 10-23: CNPJ do emitente
     nfse_num = str(int(chave[23:36]))  # posições 24-36: nº da NFS-e (sem zeros à esquerda)
 
-    # 2) Número da DPS: os dois primeiros números do cabeçalho são, em ordem,
-    # o nº da NFS-e e o nº da DPS. Valida o 1º contra a chave; se bater, usa o 2º.
-    top_nums = re.findall(r"(?m)^\s*(\d{3,12})\s*$", text)
+    # 2) Número da DPS e Série: ficam na linha de valores logo abaixo do cabeçalho
+    # "NÚMERO DA DPS  SÉRIE DA DPS  DATA E HORA DA EMISSÃO DA DPS", na ordem:
+    # <nº DPS> <série> <data> <hora>
+    lines = text.splitlines()
     dps_num = None
-    if len(top_nums) >= 2 and str(int(top_nums[0])) == nfse_num:
-        dps_num = str(int(top_nums[1]))
-    else:
-        # fallback: primeiro número do topo que não seja o nº da NFS-e
-        for n in top_nums:
-            if str(int(n)) != nfse_num and len(n) <= 10:
-                dps_num = str(int(n))
-                break
-    if dps_num is None:
-        raise ValueError("Número da DPS não encontrado no DANFSe nacional.")
-
-    # 3) Série da DPS
-    serie_match = re.search(REGEX_SERIE_NAC, text)
-    if not serie_match:
-        raise ValueError("Série da DPS não encontrada no DANFSe nacional.")
-    serie_num = serie_match.group(1)
+    serie_num = None
+    for i, line in enumerate(lines):
+        if re.search(r"(?i)N[ÚU]MERO\s+DA\s+DPS", line):
+            for j in range(i + 1, min(i + 4, len(lines))):
+                m = re.match(r"\s*(\d{1,15})\s+([0-9A-Za-z][0-9A-Za-z\-_]*)", lines[j])
+                if m:
+                    dps_num = str(int(m.group(1)))
+                    serie_num = m.group(2)
+                    break
+            break
+    if dps_num is None or serie_num is None:
+        raise ValueError("Número da DPS / Série da DPS não encontrados no DANFSe nacional.")
 
     return cnpj, dps_num, nfse_num, serie_num
 
